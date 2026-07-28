@@ -16,6 +16,7 @@ import {
   Eye, EyeOff,
 } from "lucide-react";
 import { format } from "date-fns";
+import OrphanedInvoicesPanel from "@/components/OrphanedInvoicesPanel";
 
 interface Profile {
   id: string;
@@ -273,6 +274,8 @@ const Invoices = () => {
         </div>
         );
       })()}
+
+      <OrphanedInvoicesPanel />
 
       {/* Create */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
