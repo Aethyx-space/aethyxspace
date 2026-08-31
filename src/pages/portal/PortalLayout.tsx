@@ -41,7 +41,7 @@ const baseNavItems = [
   { title: "Documents", url: "/portal/documents", icon: FolderOpen },
   { title: "Agreements", url: "/portal/agreements", icon: FileSignature },
   { title: "Payments", url: "/portal/payments", icon: CreditCard },
-  { title: "Bounty", url: "/portal/referrals", icon: GitBranch },
+  { title: "Referrals", url: "/portal/referrals", icon: GitBranch },
   { title: "Add-Ons", url: "/portal/add-ons", icon: Package },
   { title: "My Project", url: "/portal/projects", icon: FolderKanban },
   { title: "Assets", url: "/portal/assets", icon: Image },
@@ -50,23 +50,20 @@ const baseNavItems = [
 
 function PortalSidebar({
   showIntake,
-  showReferrals,
   badgeCounts,
   isViewingAsAdmin,
   viewAsProfileId,
 }: {
   showIntake: boolean;
-  showReferrals: boolean;
   badgeCounts: Record<string, number>;
   isViewingAsAdmin: boolean;
   viewAsProfileId: string | null;
 }) {
-  const filteredBase = showReferrals
-    ? baseNavItems
-    : baseNavItems.filter((item) => item.title !== "Bounty");
+  // Referrals is always visible — every client is auto-enrolled in the bounty
+  // program, so there is no per-client gate on this nav item anymore.
   const navItems = showIntake
-    ? [...filteredBase, { title: "Intake Form", url: "/portal/intake", icon: ClipboardList }]
-    : filteredBase;
+    ? [...baseNavItems, { title: "Intake Form", url: "/portal/intake", icon: ClipboardList }]
+    : baseNavItems;
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { signOut } = useAuth();
@@ -144,7 +141,6 @@ const PortalLayout = () => {
   const { user } = useAuth();
   const { profile, isViewingAsAdmin } = usePortalClientProfile();
   const [needsIntake, setNeedsIntake] = useState(false);
-  const [referralEnabled, setReferralEnabled] = useState(false);
   const [badgeCounts, setBadgeCounts] = useState<Record<string, number>>({});
 
   // Notify admin once when an invited client first signs in. Skipped entirely
@@ -159,18 +155,17 @@ const PortalLayout = () => {
         .then(() => supabase.functions.invoke("dispatch-doc-event", { body: { event_name: "portal_activated" } }))
         .catch(() => sessionStorage.removeItem(key));
     }
-    // Check intake status and referral access
+    // Check intake status
     supabase.from("client_profiles")
-      .select("intake_required, intake_completed_at, referral_enabled")
+      .select("intake_required, intake_completed_at")
       .eq("user_id", user.id).maybeSingle()
       .then(({ data }) => {
         if (data && !data.intake_completed_at) setNeedsIntake(true);
-        if (data?.referral_enabled) setReferralEnabled(true);
       });
   }, [user, isViewingAsAdmin]);
 
   // Notification badge counts for Documents/Tasks/Agreements nav items. Separate effect from
-  // the intake/referral check above so it can be reasoned about (and modified) independently.
+  // the intake check above so it can be reasoned about (and modified) independently.
   useEffect(() => {
     if (!user || isViewingAsAdmin || !profile) return;
     (async () => {
@@ -252,7 +247,6 @@ const PortalLayout = () => {
         )}
         <PortalSidebar
           showIntake={needsIntake}
-          showReferrals={referralEnabled}
           badgeCounts={badgeCounts}
           isViewingAsAdmin={isViewingAsAdmin}
           viewAsProfileId={isViewingAsAdmin ? profile?.id ?? null : null}

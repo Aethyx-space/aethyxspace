@@ -1922,7 +1922,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "bounty_hunter"
       traffic_source: "tiktok" | "instagram" | "facebook" | "other"
     }
     CompositeTypes: {

@@ -340,26 +340,39 @@ export default function ReferralProgram() {
     fetchApplicants();
   };
 
-  const generateBountyCode = () => crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-
-  const handleApproveApplicant = async (applicant: BountyApplicant) => {
+  /**
+   * Approval runs server-side in the bounty-actions edge function.
+   *
+   * It used to happen here, with the code generated in the browser as a 12-char
+   * slice of a UUID. That produced unmemorable links (/r/a3f9c2b81e04) and had
+   * no way to retry a collision, since the uniqueness check and the write were
+   * separate round-trips. The edge function derives a vanity code from the
+   * applicant's name (kmitchell), screens it against a reserved-word list, and
+   * retries on unique-violation so two admins approving at once cannot collide.
+   *
+   * `customCode` lets an admin override the generated value — mainly for
+   * collisions between hunters who share an initial and surname.
+   */
+  const handleApproveApplicant = async (applicant: BountyApplicant, customCode?: string) => {
     setReviewingId(applicant.id);
-    const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("bounty_applicants")
-      .update({
-        status: "approved",
-        code: generateBountyCode(),
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: userData.user?.id ?? null,
-      })
-      .eq("id", applicant.id);
+    const { data, error } = await supabase.functions.invoke("bounty-actions", {
+      body: { action: "approve_applicant", applicantId: applicant.id, customCode },
+    });
     setReviewingId(null);
+
     if (error) {
       toast({ title: "Approval failed", description: error.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Applicant approved" });
+    if (data?.error) {
+      toast({ title: "Approval failed", description: data.error, variant: "destructive" });
+      return;
+    }
+
+    toast({
+      title: "Applicant approved",
+      description: data?.code ? `Referral link: aethyx.space/r/${data.code}` : undefined,
+    });
     fetchApplicants();
   };
 

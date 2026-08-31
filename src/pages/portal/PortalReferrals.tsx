@@ -3,167 +3,177 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, Copy, Link2, Loader2, Users } from "lucide-react";
-import { format } from "date-fns";
+import {
+  Check,
+  Copy,
+  Link2,
+  Loader2,
+  Repeat,
+  Rocket,
+  Signature,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 
-interface ReferralProgramSettings {
+// `bounty_applicants` and `bounty_program_settings` are missing from the
+// auto-generated Supabase types (src/integrations/supabase/types.ts), so every
+// query against them goes through the codebase's standard `(supabase as any)`
+// escape hatch until the types are regenerated.
+
+interface BountyApplicant {
   id: string;
-  enabled: boolean;
-  first_reward_amount: number;
-  completion_bonus_amount: number;
-  tier_threshold: number;
-  commission_rate: number;
-  new_client_discount: number;
-  eligibility_notes: string | null;
+  full_name: string | null;
+  email: string | null;
+  code: string | null;
+  status: string | null;
+  enrollment_source: string | null;
+  activated_at: string | null;
 }
 
-interface ReferralLink {
+interface BountyProgramSettings {
   id: string;
-  client_profile_id: string;
-  code: string;
-  created_at: string;
+  build_signing_amount: number;
+  build_launch_amount: number;
+  smaller_package_rate: number;
+  growth_tier_rate: number;
+  growth_tier_threshold: number;
+  residual_rate: number;
+  residual_window_months: number;
 }
 
-interface Referral {
-  id: string;
-  referrer_profile_id: string;
-  referred_email: string;
-  referred_name: string | null;
-  status: string;
-  first_reward_paid_at: string | null;
-  completion_bonus_paid_at: string | null;
-  payout_method: string | null;
-  created_at: string;
-}
+const DISCLAIMER =
+  "Estimates only. Earnings are not guaranteed and remain subject to referral eligibility, the signed agreement, collected revenue, project milestones, refunds, disputes, and Aethyx approval.";
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pending: { label: "Pending", className: "bg-muted/60 text-muted-foreground border-border/40" },
-  signed: { label: "Signed", className: "bg-purple-500/20 text-purple-300 border-purple-500/30" },
-  live: { label: "Live", className: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
-  payout_sent: { label: "Paid Out", className: "bg-teal-500/20 text-teal-300 border-teal-500/30" },
-  cancelled: { label: "Cancelled", className: "bg-destructive/15 text-destructive-foreground/50 border-destructive/20" },
-};
+const money = (value: number) => `$${Number(value || 0).toFixed(0)}`;
+const percent = (rate: number) => `${(Number(rate || 0) * 100).toFixed(0)}%`;
 
 const PortalReferrals = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [referralCode, setReferralCode] = useState<string | null>(null);
-  const [settings, setSettings] = useState<ReferralProgramSettings | null>(null);
-  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [applicant, setApplicant] = useState<BountyApplicant | null>(null);
+  const [settings, setSettings] = useState<BountyProgramSettings | null>(null);
   const [copied, setCopied] = useState(false);
-  const [hasAccess, setHasAccess] = useState(false);
+  const [copyError, setCopyError] = useState(false);
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
+
     (async () => {
-      const { data: profileData } = await supabase
-        .from("client_profiles")
-        .select("id, referral_enabled")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      const pid = profileData?.id ?? null;
-      const enabled = profileData?.referral_enabled ?? false;
-
-      if (!enabled) {
-        setLoading(false);
-        return; // hasAccess stays false; loading state below renders the disabled message
-      }
-
-      const [linkResult, settingsResult, referralsResult] = await Promise.all([
-        pid
-          ? supabase.from("referral_links").select("*").eq("client_profile_id", pid).maybeSingle()
-          : Promise.resolve({ data: null }),
-        supabase.from("referral_program_settings").select("*").maybeSingle(),
-        pid
-          ? supabase
-              .from("referrals")
-              .select("*")
-              .eq("referrer_profile_id", pid)
-              .order("created_at", { ascending: false })
-          : Promise.resolve({ data: [] }),
+      // RLS lets an authenticated user read only their own bounty_applicants row.
+      const [applicantResult, settingsResult] = await Promise.all([
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from("bounty_applicants")
+          .select(
+            "id, full_name, email, code, status, enrollment_source, activated_at"
+          )
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any).from("bounty_program_settings").select("*").maybeSingle(),
       ]);
 
-      let code = (linkResult.data as ReferralLink | null)?.code ?? null;
-      if (!code && pid) {
-        const newCode = Math.random().toString(36).slice(2, 10);
-        const { data: inserted } = await supabase
-          .from("referral_links")
-          .insert({ client_profile_id: pid, code: newCode })
-          .select("code")
-          .single();
-        code = inserted?.code ?? null;
-      }
-
-      setReferralCode(code);
-      setSettings((settingsResult.data as ReferralProgramSettings | null));
-      setReferrals((referralsResult.data as Referral[]) || []);
-      setHasAccess(true);
+      if (cancelled) return;
+      setApplicant((applicantResult.data as BountyApplicant | null) ?? null);
+      setSettings((settingsResult.data as BountyProgramSettings | null) ?? null);
       setLoading(false);
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  const referralUrl = referralCode ? `https://aethyx.space/intake?ref=${referralCode}` : null;
+  const referralCode = applicant?.code ?? null;
+  const referralUrl = referralCode ? `https://aethyx.space/r/${referralCode}` : null;
 
-  const copyToClipboard = () => {
+  const copyToClipboard = async () => {
     if (!referralUrl) return;
-    navigator.clipboard.writeText(referralUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      // navigator.clipboard is undefined / throws on insecure origins.
+      await navigator.clipboard.writeText(referralUrl);
+      setCopied(true);
+      setCopyError(false);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyError(true);
+      setCopied(false);
+      setTimeout(() => setCopyError(false), 4000);
+    }
   };
 
-  const firstRewardAmount = settings?.first_reward_amount ?? 100;
-  const completionBonusAmount = settings?.completion_bonus_amount ?? 150;
-  const tierThreshold = settings?.tier_threshold ?? 3;
-  const commissionRate = settings?.commission_rate ?? 0.1;
-  const newClientDiscount = settings?.new_client_discount ?? 100;
+  // TODO(bounty-commissions): referral counts and earnings are hardcoded to zero
+  // until the bounty commission ledger exists. The legacy `referrals` table
+  // predates the unified bounty program and its shape no longer maps to this
+  // scale — do not derive commission math from it. Wire this up to the future
+  // bounty commission/payout source (per-referral signing, launch, package
+  // commission and residual rows) when it ships.
+  const referralCount: number = 0;
+  const totalEarned: number = 0;
+  const referralRows: Array<{
+    id: string;
+    name: string;
+    email: string;
+    status: string;
+  }> = [];
 
-  const totalEarned = referrals.reduce((sum, r) => {
-    if (r.first_reward_paid_at) sum += Number(firstRewardAmount);
-    if (r.completion_bonus_paid_at) sum += Number(completionBonusAmount);
-    return sum;
-  }, 0);
+  const signingAmount = settings?.build_signing_amount ?? 0;
+  const launchAmount = settings?.build_launch_amount ?? 0;
+  const smallerRate = settings?.smaller_package_rate ?? 0;
+  const growthRate = settings?.growth_tier_rate ?? 0;
+  const growthThreshold = settings?.growth_tier_threshold ?? 0;
+  const residualRate = settings?.residual_rate ?? 0;
+  const residualMonths = settings?.residual_window_months ?? 0;
 
-  const hasPaidRewards = referrals.some(
-    (r) => r.first_reward_paid_at || r.completion_bonus_paid_at
-  );
+  const atGrowthTier = growthThreshold > 0 && referralCount >= growthThreshold;
+  const remainingToGrowth = Math.max(growthThreshold - referralCount, 0);
+  const growthProgress =
+    growthThreshold > 0
+      ? Math.min((referralCount / growthThreshold) * 100, 100)
+      : 0;
+  const currentRate = atGrowthTier ? growthRate : smallerRate;
 
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading" />
       </div>
     );
   }
 
-  if (!hasAccess) {
+  const header = (
+    <div>
+      <h1 className="text-2xl font-display tracking-wider mb-1">Referral Program</h1>
+      <p className="text-muted-foreground text-sm">
+        You're enrolled in the Aethyx Bounty program. Refer someone and earn on
+        their signing, their launch, and everything they buy afterward.
+      </p>
+    </div>
+  );
+
+  if (!applicant) {
     return (
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-display tracking-wider mb-1">Bounty Program</h1>
-        </div>
-        <div className="rounded-lg border border-border/30 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-          The referral program isn't enabled for your account yet. Reach out if you'd like to
-          join and start earning referral rewards.
-        </div>
+      <div className="space-y-6">
+        {header}
+        <Card className="border-border/30">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <Users className="h-12 w-12 text-muted-foreground/30 mb-4" />
+            <p className="text-sm text-muted-foreground max-w-md">
+              We're still setting up your referral profile. This usually only
+              takes a moment — refresh shortly, or message us if it doesn't
+              appear.
+            </p>
+          </CardContent>
+        </Card>
+        <p className="text-xs text-muted-foreground leading-relaxed">{DISCLAIMER}</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-display tracking-wider mb-1">Bounty Program</h1>
-        <p className="text-muted-foreground text-sm">
-          Refer someone to Aethyx and earn cash rewards when they sign and go live.
-        </p>
-      </div>
-
-      {settings?.enabled === false && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-          The referral program is currently paused. Check back soon.
-        </div>
-      )}
+      {header}
 
       <Card className="border-border/30">
         <CardHeader>
@@ -180,31 +190,48 @@ const PortalReferrals = () => {
                   {referralUrl}
                 </div>
                 <Button
+                  type="button"
                   onClick={copyToClipboard}
-                  variant="outline"
                   size="sm"
-                  className="shrink-0 gap-2 border-border/30 min-w-[96px]"
+                  className="shrink-0 gap-2 min-w-[128px]"
                 >
                   {copied ? (
                     <>
-                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      <Check className="h-3.5 w-3.5" />
                       Copied!
                     </>
                   ) : (
                     <>
                       <Copy className="h-3.5 w-3.5" />
-                      Copy
+                      Copy link
                     </>
                   )}
                 </Button>
               </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
+                <span className="text-muted-foreground">
+                  Your code:{" "}
+                  <span className="font-mono text-foreground/80">{referralCode}</span>
+                </span>
+              </div>
+
+              {copyError && (
+                <p className="text-xs text-destructive" role="status">
+                  Couldn't copy automatically — select the link above and copy it
+                  manually.
+                </p>
+              )}
+
               <p className="text-xs text-muted-foreground">
-                Share this link. When someone uses it and signs with Aethyx, you earn a reward.
+                Share this link. When someone uses it and signs with Aethyx, the
+                referral is credited to you automatically.
               </p>
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Unable to generate your referral link. Please contact support.
+              Your referral code hasn't been issued yet. Message us and we'll get
+              it set up.
             </p>
           )}
         </CardContent>
@@ -212,140 +239,182 @@ const PortalReferrals = () => {
 
       <div>
         <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-4">
-          How It Works
+          What You Earn
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="border-border/30">
             <CardContent className="pt-5">
-              <div className="text-2xl mb-2">💰</div>
-              <p className="text-xs text-muted-foreground mb-1">When they sign</p>
-              <p className="text-xl font-display font-bold text-primary">
-                ${Number(firstRewardAmount).toFixed(0)}
-              </p>
-              <p className="text-xs text-muted-foreground">cash reward</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/30">
-            <CardContent className="pt-5">
-              <div className="text-2xl mb-2">🎉</div>
-              <p className="text-xs text-muted-foreground mb-1">When their project goes live</p>
-              <p className="text-xl font-display font-bold text-primary">
-                +${Number(completionBonusAmount).toFixed(0)}
-              </p>
-              <p className="text-xs text-muted-foreground">completion bonus</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/30">
-            <CardContent className="pt-5">
-              <div className="text-2xl mb-2">📈</div>
+              <Signature className="h-5 w-5 text-primary mb-2" />
               <p className="text-xs text-muted-foreground mb-1">
-                After {tierThreshold} referrals
+                When they sign a full build
               </p>
               <p className="text-xl font-display font-bold text-primary">
-                {(Number(commissionRate) * 100).toFixed(0)}%
+                {money(signingAmount)}
               </p>
-              <p className="text-xs text-muted-foreground">commission on every project</p>
+              <p className="text-xs text-muted-foreground">signing bounty</p>
             </CardContent>
           </Card>
 
           <Card className="border-border/30">
             <CardContent className="pt-5">
-              <div className="text-2xl mb-2">🎁</div>
-              <p className="text-xs text-muted-foreground mb-1">They also get</p>
-              <p className="text-xl font-display font-bold text-primary">
-                ${Number(newClientDiscount).toFixed(0)} off
+              <Rocket className="h-5 w-5 text-primary mb-2" />
+              <p className="text-xs text-muted-foreground mb-1">
+                When their site launches
               </p>
-              <p className="text-xs text-muted-foreground">their first invoice</p>
+              <p className="text-xl font-display font-bold text-primary">
+                {money(launchAmount)}
+              </p>
+              <p className="text-xs text-muted-foreground">launch bounty</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/30">
+            <CardContent className="pt-5">
+              <TrendingUp className="h-5 w-5 text-primary mb-2" />
+              <p className="text-xs text-muted-foreground mb-1">
+                Smaller packages
+              </p>
+              <p className="text-xl font-display font-bold text-primary">
+                {percent(smallerRate)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                rises to {percent(growthRate)} after {growthThreshold} referrals
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/30">
+            <CardContent className="pt-5">
+              <Repeat className="h-5 w-5 text-primary mb-2" />
+              <p className="text-xs text-muted-foreground mb-1">
+                Residual on everything they buy
+              </p>
+              <p className="text-xl font-display font-bold text-primary">
+                {percent(residualRate)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                for {residualMonths} months after they sign
+              </p>
             </CardContent>
           </Card>
         </div>
-
-        {settings?.eligibility_notes && (
-          <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
-            {settings.eligibility_notes}
-          </p>
-        )}
       </div>
 
+      <Card className="border-border/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            Growth Tier
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              {atGrowthTier ? (
+                <>
+                  You've unlocked the {percent(growthRate)} rate on smaller
+                  packages.
+                </>
+              ) : (
+                <>
+                  <span className="text-foreground font-medium">
+                    {remainingToGrowth} of {growthThreshold}
+                  </span>{" "}
+                  referrals until your rate rises to {percent(growthRate)}.
+                </>
+              )}
+            </p>
+            <span className="text-sm font-medium text-primary">
+              Current rate {percent(currentRate)}
+            </span>
+          </div>
+          <div
+            className="h-2 w-full rounded-full bg-muted/40 overflow-hidden"
+            role="progressbar"
+            aria-label="Progress toward growth tier"
+            aria-valuenow={referralCount}
+            aria-valuemin={0}
+            aria-valuemax={growthThreshold}
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: `${growthProgress}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {referralCount} qualified referral{referralCount === 1 ? "" : "s"} so far.
+          </p>
+        </CardContent>
+      </Card>
+
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
             Your Referrals
           </h2>
-          {hasPaidRewards && (
-            <span className="text-sm font-medium text-emerald-400">
-              Total earned: ${totalEarned.toFixed(2)}
+          <span className="text-sm text-muted-foreground">
+            Total earned:{" "}
+            <span className="font-medium text-foreground">
+              ${totalEarned.toFixed(2)}
             </span>
-          )}
+          </span>
         </div>
 
-        {referrals.length === 0 ? (
+        {referralRows.length === 0 ? (
           <Card className="border-border/30">
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Users className="h-12 w-12 text-muted-foreground/30 mb-4" />
-              <p className="text-muted-foreground text-sm">
-                No referrals yet. Share your link to get started.
+              <p className="text-sm text-muted-foreground max-w-sm">
+                No referrals yet. Share your link and anyone who signs through it
+                will show up here with their status and what you've earned.
               </p>
+              {referralUrl && (
+                <Button
+                  type="button"
+                  onClick={copyToClipboard}
+                  variant="outline"
+                  size="sm"
+                  className="mt-5 gap-2 border-border/30"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copy my referral link
+                    </>
+                  )}
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-2">
-            {referrals.map((ref) => {
-              const sc = STATUS_CONFIG[ref.status] ?? STATUS_CONFIG.pending;
-              return (
-                <Card key={ref.id} className="border-border/30">
-                  <CardContent className="py-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-sm">
-                            {ref.referred_name || "—"}
-                          </span>
-                          <span className="text-xs text-muted-foreground truncate">
-                            {ref.referred_email}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Submitted {format(new Date(ref.created_at), "MMM d, yyyy")}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${sc.className}`}
-                        >
-                          {sc.label}
-                        </span>
-
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            First reward{" "}
-                            {ref.first_reward_paid_at ? (
-                              <Check className="h-3.5 w-3.5 text-emerald-400" />
-                            ) : (
-                              <span className="text-muted-foreground/40">—</span>
-                            )}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            Bonus{" "}
-                            {ref.completion_bonus_paid_at ? (
-                              <Check className="h-3.5 w-3.5 text-emerald-400" />
-                            ) : (
-                              <span className="text-muted-foreground/40">—</span>
-                            )}
-                          </span>
-                        </div>
-                      </div>
+            {referralRows.map((row) => (
+              <Card key={row.id} className="border-border/30">
+                <CardContent className="py-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{row.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {row.email}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    <span className="inline-flex items-center rounded-full border border-border/40 bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
+                      {row.status}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </div>
+
+      <p className="text-xs text-muted-foreground leading-relaxed">{DISCLAIMER}</p>
     </div>
   );
 };

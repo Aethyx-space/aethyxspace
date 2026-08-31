@@ -10,6 +10,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import PageViewTracker from "@/components/PageViewTracker";
 import AdminRoute from "@/components/AdminRoute";
 import ClientRoute from "@/components/ClientRoute";
+import BountyRoute from "@/components/BountyRoute";
 import CookieConsent from "@/components/CookieConsent";
 import PublicConcierge from "@/components/PublicConcierge";
 import Home from "./pages/Home";
@@ -25,6 +26,8 @@ const Portfolio = lazy(() => import("./pages/Portfolio"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Bounty = lazy(() => import("./pages/Bounty"));
+const BountyPortal = lazy(() => import("./pages/bounty/BountyPortal"));
+const ReferralRedirect = lazy(() => import("./pages/ReferralRedirect"));
 const Advertise = lazy(() => import("./pages/Advertise"));
 const Barter = lazy(() => import("./pages/Barter"));
 const Launch = lazy(() => import("./pages/Launch"));
@@ -99,6 +102,15 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/bounty" element={<Bounty />} />
+            <Route path="/r/:code" element={<ReferralRedirect />} />
+            <Route
+              path="/bounty/portal"
+              element={
+                <BountyRoute>
+                  <BountyPortal />
+                </BountyRoute>
+              }
+            />
             <Route path="/advertise" element={<Advertise />} />
             <Route path="/barter" element={<Barter />} />
             <Route path="/launch" element={<Launch />} />

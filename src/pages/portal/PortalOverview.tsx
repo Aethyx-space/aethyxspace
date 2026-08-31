@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { User, MessageSquare, FolderOpen, Loader2 } from "lucide-react";
+import { User, MessageSquare, FolderOpen, Loader2, Copy, Check } from "lucide-react";
 
 const PortalOverview = () => {
   const { user } = useAuth();
@@ -23,6 +23,8 @@ const PortalOverview = () => {
   const [editBusinessName, setEditBusinessName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [saving, setSaving] = useState(false);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const load = async () => {
     if (!user || !resolvedProfile) return;
@@ -52,6 +54,40 @@ const PortalOverview = () => {
       ["uploaded", "awaiting_signature", "completed"].includes(s.status)
     ).length;
     setDocCount((docRes.data || []).length + uploadedSlotCount);
+
+    // Every client is auto-enrolled in the bounty/referral program, so their
+    // referral code lives on their own `bounty_applicants` row (RLS: user_id =
+    // auth.uid()). Cast is required — the table is missing from the generated
+    // Supabase types, matching the existing pattern above. Skipped while an
+    // admin is previewing, since auth.uid() is the admin, not the client.
+    if (!isViewingAsAdmin) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: applicant } = await (supabase as any)
+        .from("bounty_applicants")
+        .select("code")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      setReferralCode(applicant?.code ?? null);
+    }
+  };
+
+  const referralUrl = referralCode ? `https://aethyx.space/r/${referralCode}` : null;
+
+  const copyReferralLink = async () => {
+    if (!referralUrl) return;
+    try {
+      // navigator.clipboard is unavailable / throws on insecure origins.
+      await navigator.clipboard.writeText(referralUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({ title: "Referral link copied", description: referralUrl });
+    } catch {
+      toast({
+        title: "Couldn't copy automatically",
+        description: `Copy your link manually: ${referralUrl}`,
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
@@ -96,6 +132,35 @@ const PortalOverview = () => {
       <p className="text-muted-foreground mb-8">
         This is your client portal. Here you can communicate with our team, view documents, & manage your project.
       </p>
+
+      {referralUrl && (
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-border/30 bg-card px-4 py-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Earn with every referral</p>
+            <p className="text-xs text-muted-foreground truncate">
+              Share your link — <span className="font-mono">{referralUrl}</span>
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={copyReferralLink}
+            size="sm"
+            className="shrink-0 gap-2 min-w-[176px]"
+          >
+            {copied ? (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                Copy my referral link
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <button onClick={openEdit} disabled={isViewingAsAdmin} className="text-left block disabled:cursor-default">
