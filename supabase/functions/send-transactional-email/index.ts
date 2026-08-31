@@ -5,6 +5,8 @@ import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 
 const FROM_PERSONAL = 'Kristin at Aethyx <kristinmitchell@aethyx.space>'
 const FROM_BRAND = 'Aethyx Web Design <kristinmitchell@aethyx.space>'
+// Every outgoing email BCCs Kristin so she always has a copy of what clients received.
+const ADMIN_COPY_EMAIL = 'kmitch2087@gmail.com'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -121,6 +123,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       from: template.senderType === 'brand' ? FROM_BRAND : FROM_PERSONAL,
       to: [to], subject, html, text,
+      ...(to.toLowerCase() !== ADMIN_COPY_EMAIL ? { bcc: [ADMIN_COPY_EMAIL] } : {}),
       ...(attachments.length > 0 ? { attachments } : {}),
     }),
   })

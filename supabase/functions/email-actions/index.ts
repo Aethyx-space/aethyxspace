@@ -76,7 +76,11 @@ Deno.serve(async (req: Request) => {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: FROM_PERSONAL, to: [to], subject, html: content.html }),
+        body: JSON.stringify({
+          from: FROM_PERSONAL, to: [to], subject, html: content.html,
+          // Every outgoing email BCCs Kristin so she always has a copy.
+          ...(to.toLowerCase() !== "kmitch2087@gmail.com" ? { bcc: ["kmitch2087@gmail.com"] } : {}),
+        }),
       });
       const resBody = await res.json();
       await admin.from("email_send_log").insert({
