@@ -6,7 +6,8 @@
 // Titles/descriptions mirror each page's <Seo> props — keep them in sync when
 // a page's Seo changes.
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const SITE = "https://aethyx.space";
 const DIST = "dist";
@@ -173,6 +174,47 @@ const esc = (s) => s.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceA
 
 const shell = readFileSync(join(DIST, "index.html"), "utf8");
 
+// Page body prerender: dist-ssr/entry.js is built by `npm run build` from
+// src/prerender/entry.tsx. Best-effort like the blog fetch: if the bundle is
+// missing or a page throws, that route keeps the empty shell body and the
+// build still succeeds.
+const SSR_ENTRY = resolve("dist-ssr/entry.js");
+async function loadRenderer() {
+  if (!existsSync(SSR_ENTRY)) {
+    console.warn("prerender-heads: no SSR bundle — page bodies not prerendered");
+    return null;
+  }
+  // Browser globals some modules touch at import time (e.g. the Supabase
+  // client's localStorage). In-memory stand-ins; nothing is persisted.
+  if (typeof globalThis.localStorage === "undefined" || !globalThis.localStorage?.getItem) {
+    const mem = new Map();
+    globalThis.localStorage = {
+      getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+      setItem: (k, v) => mem.set(k, String(v)),
+      removeItem: (k) => mem.delete(k),
+      clear: () => mem.clear(),
+    };
+  }
+  try {
+    return await import(pathToFileURL(SSR_ENTRY).href);
+  } catch (err) {
+    console.warn("prerender-heads: SSR bundle failed to load —", err.message);
+    return null;
+  }
+}
+const ssr = await loadRenderer();
+let bodies = 0;
+
+function prerenderBody(r) {
+  if (!ssr) return null;
+  try {
+    return r.renderBody ? r.renderBody(ssr) : ssr.render(r.path);
+  } catch (err) {
+    console.warn(`prerender-heads: body render failed for ${r.path} —`, err.message);
+    return null;
+  }
+}
+
 let written = 0;
 function writeRoute(r) {
   const url = SITE + (r.path === "/" ? "/" : r.path);
@@ -210,7 +252,13 @@ function writeRoute(r) {
   }
   const extra = [`<link rel="canonical" href="${url}" />`];
   if (r.noindex) extra.push(`<meta name="robots" content="noindex, nofollow" />`);
+  const body = prerenderBody(r);
+  if (body?.jsonLd) extra.push(body.jsonLd);
   html = html.replace("</head>", `    ${extra.join("\n    ")}\n  </head>`);
+  if (body?.html) {
+    html = html.replace('<div id="root"></div>', () => `<div id="root">${body.html}</div>`);
+    bodies++;
+  }
 
   // Flat `<route>.html` files: Cloudflare Pages serves /services from
   // services.html with no redirect (a services/index.html directory would
@@ -221,18 +269,24 @@ function writeRoute(r) {
   written++;
 }
 
-for (const r of ROUTES) writeRoute(r);
+const posts = await fetchPublishedPosts();
+
+for (const r of ROUTES) {
+  // The Blog component loads posts in the browser; give crawlers the list.
+  if (r.path === "/blog" && posts.length) writeRoute({ ...r, renderBody: (m) => m.renderBlogIndex(posts) });
+  else writeRoute(r);
+}
 
 // Published blog posts: real prerendered heads (unique title/description/
 // canonical/og), fixing the "generic shell head on every post" gap. Posts
 // published after this build fall back to the SPA shell until the next build.
-const posts = await fetchPublishedPosts();
 for (const p of posts) {
   writeRoute({
     path: `/blog/${p.slug}`,
     title: `${p.title} | Aethyx Blog`,
     description: postDescription(p),
     ogImage: p.cover_image_url || `${SITE}/og/blog.png`,
+    renderBody: (m) => m.renderPost(p),
   });
 }
 
@@ -263,4 +317,6 @@ const notFound = shell
   .replace("</head>", `    <meta name="robots" content="noindex" />\n  </head>`);
 writeFileSync(join(DIST, "404.html"), notFound);
 
-console.log(`prerender-heads: wrote ${written} route heads (${posts.length} blog posts) + sitemap.xml + 404.html`);
+console.log(
+  `prerender-heads: wrote ${written} route heads (${posts.length} blog posts, ${bodies} with page text) + sitemap.xml + 404.html`,
+);
