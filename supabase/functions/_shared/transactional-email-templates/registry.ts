@@ -5,6 +5,8 @@ export interface TemplateEntry {
   component: React.ComponentType<any>
   subject: string | ((data: Record<string, any>) => string)
   to?: string
+  /** 'personal' → "Kristin at Aethyx" | 'brand' → "Aethyx Web Design". Defaults to 'personal'. */
+  senderType?: 'personal' | 'brand'
   displayName?: string
   previewData?: Record<string, any>
 }
@@ -19,6 +21,17 @@ import { template as paymentReceived } from './payment-received.tsx'
 import { template as documentShare } from './document-share.tsx'
 import { template as invoiceDelivery } from './invoice-delivery.tsx'
 import { template as intakeRequired } from './intake-required.tsx'
+import { template as newDocuments } from './new-documents.tsx'
+import { template as feeWaived } from './fee-waived.tsx'
+import { template as marketingServicesSpotlight } from './marketing-services-spotlight.tsx'
+import { template as referralSigned } from './referral-signed.tsx'
+import { template as referralPayout } from './referral-payout.tsx'
+import { template as addOnActivated } from './add-on-activated.tsx'
+import { template as bountyApproved } from './bounty-approved.tsx'
+import { template as adminCompose } from './admin-compose.tsx'
+import { template as consultationScheduled } from './consultation-scheduled.tsx'
+import { template as offerLeadNotification } from './offer-lead-notification.tsx'
+import { template as agreementDirect } from './agreement-direct.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'inquiry-notification': inquiryNotification,
@@ -31,4 +44,15 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'document-share': documentShare,
   'invoice-delivery': invoiceDelivery,
   'intake-required': intakeRequired,
+  'new-documents': newDocuments,
+  'fee-waived': feeWaived,
+  'marketing-services-spotlight': marketingServicesSpotlight,
+  'referral-signed': referralSigned,
+  'referral-payout': referralPayout,
+  'add-on-activated': addOnActivated,
+  'bounty-approved': bountyApproved,
+  'admin-compose': adminCompose,
+  'consultation-scheduled': consultationScheduled,
+  'offer-lead-notification': offerLeadNotification,
+  'agreement-direct': agreementDirect,
 }

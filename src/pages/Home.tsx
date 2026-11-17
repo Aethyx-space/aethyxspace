@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ArrowRight, Globe, Palette, Layers } from "lucide-react";
 
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import AdSlot from "@/components/AdSlot";
 import Seo from "@/components/Seo";
-import { organizationSchema, websiteSchema } from "@/lib/seoSchemas";
 
 const homeFaqSchema = {
   "@context": "https://schema.org",
@@ -59,15 +59,16 @@ const trafficButtons = [
 ];
 
 const Home = () => {
-  const navigate = useNavigate();
   const [otherOpen, setOtherOpen] = useState(false);
+  const [sourceReported, setSourceReported] = useState(false);
 
   const handleTrafficClick = async (source: "tiktok" | "instagram" | "facebook" | "other", otherDetails?: string) => {
+    // Thank them in place — don't navigate away from the page they just landed on.
+    setSourceReported(true);
     await supabase.from("traffic_clicks").insert({
       source,
       other_details: otherDetails || null,
     } as any);
-    navigate("/contact");
   };
 
   return (
@@ -76,7 +77,7 @@ const Home = () => {
         title="Aethyx — Premium Web Design & Branding | Rhode Island"
         description="Premium web design, brand identity, and SEO architecture for ambitious businesses. Founder-led studio in Rhode Island, serving the USA. Book a consultation."
         path="/"
-        jsonLd={[organizationSchema, websiteSchema, homeFaqSchema]}
+        jsonLd={homeFaqSchema}
       />
       <Navbar />
 
@@ -129,25 +130,45 @@ const Home = () => {
             Woman Owned • RI-based • Serving The Entire USA
           </p>
 
+          <p className="text-foreground/50 text-sm mt-6">
+            Need it fast and fixed-price?{" "}
+            <Link to="/launch" className="text-primary underline hover:text-primary/80">
+              Launch-ready sites from $749 — live in 7 days →
+            </Link>
+          </p>
+
           {/* Traffic source buttons */}
-          <p className="text-foreground/40 text-xs mt-10 tracking-[0.25em] uppercase">How did you find us?</p>
-          <div className="flex flex-wrap justify-center gap-3 mt-4">
-            {trafficButtons.map((btn) => (
-              <button
-                key={btn.source}
-                onClick={() => {
-                  if (btn.source === "other") {
-                    setOtherOpen(true);
-                  } else {
-                    handleTrafficClick(btn.source);
-                  }
-                }}
-                className="px-5 py-2 rounded-full border border-foreground/20 text-foreground/60 text-xs tracking-[0.25em] uppercase hover:border-primary/60 hover:text-primary transition-all"
-              >
-                {btn.label}
-              </button>
-            ))}
-          </div>
+          {sourceReported ? (
+            <div className="mt-10 max-w-md mx-auto rounded-2xl border border-primary/30 bg-primary/5 px-6 py-5">
+              <p className="text-primary font-display text-lg mb-2">Thank you 💛</p>
+              <p className="text-foreground/60 text-sm leading-relaxed">
+                As a one-woman studio, knowing how you found me is genuinely valuable — it's real
+                data that tells me where to show up more, so more people like you can find Aethyx.
+                Thanks for taking the two seconds.
+              </p>
+            </div>
+          ) : (
+            <>
+              <p className="text-foreground/40 text-xs mt-10 tracking-[0.25em] uppercase">How did you find us?</p>
+              <div className="flex flex-wrap justify-center gap-3 mt-4">
+                {trafficButtons.map((btn) => (
+                  <button
+                    key={btn.source}
+                    onClick={() => {
+                      if (btn.source === "other") {
+                        setOtherOpen(true);
+                      } else {
+                        handleTrafficClick(btn.source);
+                      }
+                    }}
+                    className="px-5 py-2 rounded-full border border-foreground/20 text-foreground/60 text-xs tracking-[0.25em] uppercase hover:border-primary/60 hover:text-primary transition-all"
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -241,7 +262,7 @@ const Home = () => {
           >
             <img
               src={aethyxLogo}
-              alt="Aethyx"
+              alt="Aethyx web design studio logo"
               className="mx-auto w-full max-w-md md:max-w-lg drop-shadow-[0_0_40px_hsl(var(--primary)/0.25)] group-hover:drop-shadow-[0_0_60px_hsl(var(--primary)/0.45)] transition-all duration-500"
             />
           </Link>
@@ -262,7 +283,7 @@ const Home = () => {
         <p className="text-primary text-xs tracking-[0.4em] uppercase mb-4">Ready to Shift?</p>
         <h2 className="font-display text-3xl md:text-5xl mb-6 tracking-tight">Let's build something they can't ignore.</h2>
         <p className="text-muted-foreground text-lg max-w-xl mx-auto mb-10">
-          Free to submit, no payment required at this time.
+          Submitting the form is free. If we're a good fit, the next step is a focused $50 strategy consultation.
         </p>
         <Link
           to="/intake"
@@ -271,6 +292,8 @@ const Home = () => {
           Let's Connect <ArrowRight className="h-4 w-4" />
         </Link>
       </section>
+
+      <AdSlot />
 
       <Footer />
     </div>

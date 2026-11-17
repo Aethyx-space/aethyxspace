@@ -163,16 +163,17 @@ const MedSpa = () => {
       <Seo
         title="Med Spa Web Design — Premium Websites for Aesthetic Clinics | Aethyx"
         description="Luxury website design for med spas, aesthetic clinics, and wellness brands. Custom booking integrations, brand-aligned visuals, and SEO built for the aesthetics industry."
-        path="/medspa"
+        path="/industries/medspa"
+        noindex
         jsonLd={[
           breadcrumb([
             { name: "Home", path: "/" },
-            { name: "Med Spa Web Design", path: "/medspa" },
+            { name: "Med Spa Web Design", path: "/industries/medspa" },
           ]),
           serviceSchema(
             "Med Spa & Aesthetic Clinic Web Design",
             "Premium website design and brand visuals for med spas and aesthetic clinics. Includes booking integration (Mindbody, Boulevard, Zenoti), SEO, and SEO-safe migration.",
-            "/medspa"
+            "/industries/medspa"
           ),
         ]}
       />
@@ -211,7 +212,7 @@ const MedSpa = () => {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                to="/contact"
+                to="/intake"
                 className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-[hsl(40,30%,50%)] text-[hsl(40,5%,8%)] font-semibold tracking-wide uppercase text-sm hover:bg-[hsl(40,30%,60%)] transition-all hover:-translate-y-0.5 font-['Inter',sans-serif]"
               >
                 Get My Free Digital Audit <ArrowRight className="h-4 w-4" />
@@ -447,7 +448,7 @@ const MedSpa = () => {
             website. Let's build the digital authority your clinic deserves.
           </p>
           <Link
-            to="/contact"
+            to="/intake"
             className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-[hsl(40,30%,45%)] text-[hsl(40,5%,8%)] font-semibold tracking-wide uppercase text-sm hover:bg-[hsl(40,30%,55%)] transition-all hover:-translate-y-0.5 font-['Inter',sans-serif]"
           >
             Book Your Free 15-Point Digital Audit{" "}

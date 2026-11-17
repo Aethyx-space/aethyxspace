@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import Seo from "@/components/Seo";
+import AdminAssistant from "@/components/AdminAssistant";
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +21,7 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
+  Inbox as InboxIcon,
   FileText,
   MessageSquare,
   Star,
@@ -25,14 +29,18 @@ import {
   DollarSign,
   Users,
   FolderOpen,
+  FolderKanban,
   Image as ImageIcon,
   Receipt,
   LogOut,
+  GitBranch,
+  Puzzle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
+  { title: "Inbox", url: "/admin/inbox", icon: InboxIcon },
   { title: "Intakes", url: "/admin/intakes", icon: MessageSquare },
   { title: "Intake Form", url: "/admin/intake-form", icon: FileSignature },
   { title: "Inquiries", url: "/admin/inquiries", icon: MessageSquare },
@@ -41,9 +49,12 @@ const navItems = [
   { title: "Agreements", url: "/admin/agreements", icon: FileSignature },
   { title: "Financials", url: "/admin/financials", icon: DollarSign },
   { title: "Clients", url: "/admin/clients", icon: Users },
+  { title: "Projects", url: "/admin/projects", icon: FolderKanban },
   { title: "Invoices", url: "/admin/invoices", icon: Receipt },
   { title: "Documents", url: "/admin/documents", icon: FolderOpen },
   { title: "Media", url: "/admin/media", icon: ImageIcon },
+  { title: "Bounty Program", url: "/admin/referral-program", icon: GitBranch },
+  { title: "Add-Ons", url: "/admin/add-ons", icon: Puzzle },
 ];
 
 function AdminSidebar() {
@@ -52,6 +63,18 @@ function AdminSidebar() {
   const location = useLocation();
   const { signOut } = useAuth();
   const navigate = useNavigate();
+  const [requestedAddOnCount, setRequestedAddOnCount] = useState(0);
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("client_add_ons")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "requested")
+      .then(({ count }: { count: number | null }) => setRequestedAddOnCount(count ?? 0));
+    // Re-fetch on every route change (not just on mount) so the badge reflects add-ons
+    // requested/resolved elsewhere without requiring a hard reload.
+  }, [location.pathname]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -78,6 +101,11 @@ function AdminSidebar() {
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
+                      {!collapsed && item.title === "Clients" && requestedAddOnCount > 0 && (
+                        <span className="ml-auto rounded-full bg-primary text-primary-foreground text-[10px] leading-none px-1.5 py-1">
+                          {requestedAddOnCount}
+                        </span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -108,7 +136,25 @@ const AdminLayout = () => {
       <Seo title="Admin | Aethyx" description="Aethyx admin dashboard." noindex />
       <div className="min-h-screen flex w-full bg-transparent">
         <AdminSidebar />
-        <div className="flex-1 flex flex-col bg-white text-black">
+        <div
+          className="flex-1 flex flex-col bg-white text-black"
+          style={{
+            "--background": "0 0% 100%",
+            "--foreground": "0 0% 4%",
+            "--card": "0 0% 98%",
+            "--card-foreground": "0 0% 4%",
+            "--popover": "0 0% 100%",
+            "--popover-foreground": "0 0% 4%",
+            "--muted": "0 0% 96%",
+            "--muted-foreground": "0 0% 45%",
+            "--input": "0 0% 93%",
+            "--border": "0 0% 88%",
+            "--secondary": "0 0% 96%",
+            "--secondary-foreground": "0 0% 9%",
+            "--accent": "0 0% 96%",
+            "--accent-foreground": "0 0% 9%",
+          } as React.CSSProperties}
+        >
           <header className="h-12 flex items-center border-b border-black/10 px-4 bg-white">
             <SidebarTrigger className="text-black hover:bg-black/5" />
             <span className="ml-4 font-display text-sm tracking-wider text-black/60">
@@ -120,6 +166,7 @@ const AdminLayout = () => {
           </main>
         </div>
       </div>
+      <AdminAssistant />
     </SidebarProvider>
   );
 };

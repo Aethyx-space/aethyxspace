@@ -3,14 +3,13 @@ import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const allowedOrigins = [
-  "https://aethyxspace.lovable.app",
   "https://aethyx.space",
   "https://www.aethyx.space",
   "http://localhost:8080",
   "http://localhost:5173",
 ];
 const getCors = (origin: string | null) => {
-  const ok = origin && (allowedOrigins.includes(origin) || origin.endsWith(".lovable.app") || origin.endsWith(".lovableproject.com"));
+  const ok = origin && allowedOrigins.includes(origin);
   return {
     "Access-Control-Allow-Origin": ok ? origin! : "",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -30,7 +29,8 @@ Deno.serve(async (req) => {
     const { data: roleRow } = await admin.from("user_roles").select("role").eq("user_id", userData.user.id).eq("role", "admin").maybeSingle();
     if (!roleRow) return new Response(JSON.stringify({ error: "Admin only" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
 
-    const { profileId, description, amount, daysUntilDue } = await req.json();
+    const { profileId, description, amount, daysUntilDue, finalize } = await req.json();
+    const shouldFinalize = finalize !== false; // default true — preserves existing "Create & send" behavior exactly
     if (!profileId || !description || !amount) {
       return new Response(JSON.stringify({ error: "profileId, description, amount required" }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
     }
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       currency: "usd",
       description: description.slice(0, 200),
     });
-    const finalized = await stripe.invoices.finalizeInvoice(invoice.id);
+    const finalized = shouldFinalize ? await stripe.invoices.finalizeInvoice(invoice.id) : invoice;
 
     // Store locally
     const { data: localInv } = await admin.from("client_invoices").upsert({
@@ -83,36 +83,59 @@ Deno.serve(async (req) => {
       amount_due: amt,
       amount_paid: 0,
       currency: "usd",
-      status: finalized.status || "open",
+      status: finalized.status || (shouldFinalize ? "open" : "draft"),
       description,
-      hosted_invoice_url: finalized.hosted_invoice_url,
-      invoice_pdf: finalized.invoice_pdf,
+      hosted_invoice_url: finalized.hosted_invoice_url ?? null,
+      invoice_pdf: finalized.invoice_pdf ?? null,
       due_date: finalized.due_date ? new Date(finalized.due_date * 1000).toISOString() : null,
       email: profile.email,
     }, { onConflict: "stripe_invoice_id" }).select().single();
 
-    // Notify client (branded email — link to portal payment page, not Stripe)
-    const portalPaymentUrl = `${origin}/portal/pay/${localInv?.id || ""}`;
-    await admin.functions.invoke("send-transactional-email", {
-      body: {
-        templateName: "new-invoice",
-        recipientEmail: profile.email,
-        idempotencyKey: `new-invoice-${finalized.id}`,
-        templateData: {
-          firstName: profile.first_name || "",
-          invoiceNumber: finalized.number,
-          amount: amt.toFixed(2),
-          description,
-          payUrl: portalPaymentUrl,
+    // Notify client (branded email — link to portal payment page, not Stripe) — only
+    // when actually finalizing. A draft save has nothing to notify the client about yet,
+    // and must not be document-list-visible either (that would make it payable via the
+    // portal's auto-finalize-on-pay behavior before the admin ever chose to send it).
+    if (shouldFinalize) {
+      // System-generated document-list entry — no real file, just a pointer so the
+      // invoice shows up in the client's Documents list with an inline pay prompt.
+      // Only created here (not for drafts) so a saved-but-unsent draft is never
+      // client-visible or payable.
+      if (localInv?.id) {
+        // NB: client_documents.file_url is NOT NULL in the schema (Task 1's migration only
+        // added linked_invoice_id — it didn't relax file_url) — use "" as the "no real file"
+        // sentinel instead of null. All rendering branches on linked_invoice_id, not file_url,
+        // so this has no effect on the portal/admin UI.
+        await admin.from("client_documents").insert({
+          client_profile_id: profileId,
+          user_id: profile.user_id,
+          title: `Invoice ${finalized.number || ""}`.trim(),
+          file_url: "",
+          uploaded_by: "admin",
+          linked_invoice_id: localInv.id,
+        });
+      }
+      const portalPaymentUrl = `${origin}/portal/pay/${localInv?.id || ""}`;
+      await admin.functions.invoke("send-transactional-email", {
+        body: {
+          templateName: "new-invoice",
+          recipientEmail: profile.email,
+          idempotencyKey: `new-invoice-${finalized.id}`,
+          templateData: {
+            firstName: profile.first_name || "",
+            invoiceNumber: finalized.number,
+            amount: amt.toFixed(2),
+            description,
+            payUrl: portalPaymentUrl,
+          },
         },
-      },
-    });
+      });
+    }
 
     return new Response(JSON.stringify({
       success: true,
       invoiceId: localInv?.id,
       stripeInvoiceId: finalized.id,
-      hostedUrl: finalized.hosted_invoice_url,
+      hostedUrl: finalized.hosted_invoice_url ?? null,
     }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("[create-admin-invoice]", err);

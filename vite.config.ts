@@ -12,6 +12,11 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  // Build-time prerender bundle (src/prerender/entry.tsx): inline CommonJS deps
+  // whose named exports Node's ESM loader can't see.
+  ssr: {
+    noExternal: ["react-helmet-async"],
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {

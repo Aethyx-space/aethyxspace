@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -46,6 +46,8 @@ const Intake = () => {
   const [submitting, setSubmitting] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get("ref");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -112,6 +114,7 @@ const Intake = () => {
       business_name: businessVal,
       responses,
       status: "new",
+      referral_code: referralCode || null,
     });
     setSubmitting(false);
 
@@ -119,6 +122,41 @@ const Intake = () => {
       console.error("Intake submit error:", error);
       toast({ title: "Submission failed", description: "Something went wrong. Please try again.", variant: "destructive" });
       return;
+    }
+
+    if (referralCode) {
+      supabase
+        .rpc("resolve_and_record_referral", {
+          p_code: referralCode,
+          p_intake_id: intakeId,
+          p_referred_name: fullName,
+          p_referred_email: emailVal,
+        })
+        .then(({ data: waived, error: rpcError }) => {
+          if (rpcError) {
+            console.warn("Referral resolution failed:", rpcError);
+            return;
+          }
+          // Mirror the admin's manual "waive fee" action: send the same fee-waived
+          // email whenever a valid referral/bounty code actually waives the fee here,
+          // so the client is notified consistently regardless of which path waived it.
+          if (waived) {
+            supabase.functions
+              .invoke("send-transactional-email", {
+                body: {
+                  templateName: "fee-waived",
+                  recipientEmail: emailVal,
+                  idempotencyKey: `fee-waived-${intakeId}`,
+                  templateData: {
+                    firstName: fullName.split(" ")[0] || "",
+                    originalAmount: "50.00",
+                    discountLabel: "Referral code",
+                  },
+                },
+              })
+              .catch((err) => console.warn("Fee-waived email failed:", err));
+          }
+        });
     }
 
     // Notify admin (fire-and-forget — don't block the user on email failure)
@@ -180,7 +218,7 @@ const Intake = () => {
     if (f.field_type === "select") {
       return (
         <Select value={values[f.field_key] || ""} onValueChange={(v) => setVal(f.field_key, v)}>
-          <SelectTrigger className={inputClass}>
+          <SelectTrigger id={f.field_key} aria-required={f.required} className={inputClass}>
             <SelectValue placeholder="Select one" />
           </SelectTrigger>
           <SelectContent>
@@ -283,7 +321,7 @@ const Intake = () => {
                   )}
                 </Button>
                 <p className="text-xs text-muted-foreground mt-4">
-                  Free to submit. No payment required at this step.
+                  Submitting this form is free. If we're a good fit, your next step is the $50 strategy consultation — non-refundable, credited toward your project, one reschedule included with 4+ hours' notice.
                 </p>
               </div>
             </form>

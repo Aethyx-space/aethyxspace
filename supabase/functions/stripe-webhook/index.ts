@@ -1,15 +1,21 @@
 // Stripe webhook: keeps financial_records in sync in real time
 // Public (no JWT) — verifies signature with STRIPE_WEBHOOK_SECRET
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import Stripe from "npm:stripe@18.5.0";
 
 Deno.serve(async (req) => {
   try {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
-    if (!stripeKey || !webhookSecret) return new Response("Stripe secrets not configured", { status: 500 });
+    if (!stripeKey || !webhookSecret) {
+      // Say which name is missing (never values) — a combined message made a 4-day
+      // outage undiagnosable from Stripe's side.
+      const missing = [!stripeKey && "STRIPE_SECRET_KEY", !webhookSecret && "STRIPE_WEBHOOK_SECRET"].filter(Boolean).join(", ");
+      console.error(`[stripe-webhook] missing secrets: ${missing}`);
+      return new Response(`Stripe secrets not configured: ${missing}`, { status: 500 });
+    }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const sig = req.headers.get("stripe-signature");
     if (!sig) return new Response("Missing signature", { status: 400 });
 
@@ -151,6 +157,13 @@ Deno.serve(async (req) => {
       case "invoice.paid":
       case "invoice.payment_succeeded": {
         const inv = event.data.object as Stripe.Invoice;
+        // Consultation-fee invoices are tied to an intake, not a client profile
+        if (inv.metadata?.type === "consultation_invoice" && inv.metadata?.intake_id) {
+          await admin
+            .from("client_intakes")
+            .update({ consultation_paid_at: new Date().toISOString(), status: "paid" })
+            .eq("id", inv.metadata.intake_id);
+        }
         const profile = await upsertInvoice(inv);
         if (profile?.email) {
           await admin.functions.invoke("send-transactional-email", {
