@@ -10,6 +10,8 @@
 # pretty-URL normalization). Consequence: a post published AFTER the last
 # build 404s until the next Pages build (any git push triggers one). Unknown
 # blog URLs correctly return 404.
+/admin / 200
+/portal / 200
 /admin/* / 200
 /portal/* / 200
 
