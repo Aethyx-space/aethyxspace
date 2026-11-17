@@ -4,52 +4,10 @@
  */
 
 const SITE_URL = "https://aethyx.space";
-const LOGO = `${SITE_URL}/favicon.png`;
 
-export const organizationSchema = {
-  "@context": "https://schema.org",
-  "@type": "ProfessionalService",
-  "@id": `${SITE_URL}#organization`,
-  name: "Aethyx",
-  alternateName: "Aethyx Studio",
-  url: SITE_URL,
-  logo: LOGO,
-  image: LOGO,
-  email: "customerservice@aethyx.space",
-  telephone: "+1-401-589-1023",
-  description:
-    "Premium web design, branding, and digital experience studio for ambitious brands. Based in Rhode Island, serving the entire United States.",
-  address: {
-    "@type": "PostalAddress",
-    addressRegion: "RI",
-    addressCountry: "US",
-  },
-  areaServed: {
-    "@type": "Country",
-    name: "United States",
-  },
-  priceRange: "$$$",
-  knowsAbout: [
-    "Web Design",
-    "Website Redesign",
-    "Brand Identity",
-    "Custom Website Development",
-    "E-commerce",
-    "SEO",
-    "Generative Engine Optimization",
-    "Digital Strategy",
-  ],
-};
-
-export const websiteSchema = {
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "@id": `${SITE_URL}#website`,
-  url: SITE_URL,
-  name: "Aethyx",
-  publisher: { "@id": `${SITE_URL}#organization` },
-  inLanguage: "en-US",
-};
+// Organization (ProfessionalService) and WebSite schemas live as static JSON-LD
+// in index.html so every prerendered page carries them without JavaScript.
+// Keep that block in sync if the business details change.
 
 export const breadcrumb = (items: { name: string; path: string }[]) => ({
   "@context": "https://schema.org",

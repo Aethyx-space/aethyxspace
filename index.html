@@ -45,6 +45,47 @@
 
     <!-- LLM discovery -->
     <link rel="alternate" type="text/plain" title="llms.txt" href="/llms.txt" />
+    <!-- Structured data: static so crawlers that don't run JavaScript still see it -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "ProfessionalService",
+          "@id": "https://aethyx.space#organization",
+          "name": "Aethyx",
+          "alternateName": "Aethyx Studio",
+          "url": "https://aethyx.space",
+          "logo": "https://aethyx.space/favicon.png",
+          "image": "https://aethyx.space/og-image.jpg",
+          "email": "customerservice@aethyx.space",
+          "telephone": "+1-401-589-1023",
+          "description": "Premium web design, branding, and digital experience studio for ambitious brands. Based in Rhode Island, serving the entire United States.",
+          "address": { "@type": "PostalAddress", "addressRegion": "RI", "addressCountry": "US" },
+          "areaServed": { "@type": "Country", "name": "United States" },
+          "priceRange": "$$$",
+          "founder": { "@type": "Person", "name": "Kristin Mitchell" },
+          "sameAs": [
+            "https://www.facebook.com/Aethyxspace/",
+            "https://www.instagram.com/aethyxspace/",
+            "https://www.linkedin.com/in/kristinaethyx"
+          ],
+          "knowsAbout": [
+            "Web Design", "Website Redesign", "Brand Identity", "Custom Website Development",
+            "E-commerce", "SEO", "Generative Engine Optimization", "Digital Strategy"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://aethyx.space#website",
+          "url": "https://aethyx.space",
+          "name": "Aethyx",
+          "publisher": { "@id": "https://aethyx.space#organization" },
+          "inLanguage": "en-US"
+        }
+      ]
+    }
+    </script>
   </head>
 
   <body>
