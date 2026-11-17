@@ -218,7 +218,7 @@ const Intake = () => {
     if (f.field_type === "select") {
       return (
         <Select value={values[f.field_key] || ""} onValueChange={(v) => setVal(f.field_key, v)}>
-          <SelectTrigger className={inputClass}>
+          <SelectTrigger id={f.field_key} aria-required={f.required} className={inputClass}>
             <SelectValue placeholder="Select one" />
           </SelectTrigger>
           <SelectContent>

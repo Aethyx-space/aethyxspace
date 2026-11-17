@@ -6,7 +6,6 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import AdSlot from "@/components/AdSlot";
 import Seo from "@/components/Seo";
-import { organizationSchema, websiteSchema } from "@/lib/seoSchemas";
 
 const homeFaqSchema = {
   "@context": "https://schema.org",
@@ -78,7 +77,7 @@ const Home = () => {
         title="Aethyx — Premium Web Design & Branding | Rhode Island"
         description="Premium web design, brand identity, and SEO architecture for ambitious businesses. Founder-led studio in Rhode Island, serving the USA. Book a consultation."
         path="/"
-        jsonLd={[organizationSchema, websiteSchema, homeFaqSchema]}
+        jsonLd={homeFaqSchema}
       />
       <Navbar />
 
@@ -263,7 +262,7 @@ const Home = () => {
           >
             <img
               src={aethyxLogo}
-              alt="Aethyx"
+              alt="Aethyx web design studio logo"
               className="mx-auto w-full max-w-md md:max-w-lg drop-shadow-[0_0_40px_hsl(var(--primary)/0.25)] group-hover:drop-shadow-[0_0_60px_hsl(var(--primary)/0.45)] transition-all duration-500"
             />
           </Link>
