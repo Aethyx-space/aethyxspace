@@ -21,7 +21,7 @@ existing code than assumed, and surfaces a real regression from earlier the same
   entire page fail to load correctly. Since the new Tasks feature hangs off the same
   plan/task relationship, this needs fixing as part of this section, not left broken.
 - **Confirmed `client_project_tasks` (not `project_tasks`) is the right table.**
-  `.lovable/plan.md` describes a `project_tasks`/`project_updates`/`client_projects` schema for
+  `docs/project-context/plan.md` describes a `project_tasks`/`project_updates`/`client_projects` schema for
   a separate, deferred, never-built Claude Desktop integration edge function — unrelated,
   not built, not to be confused with the real, already-shipped
   `client_project_tasks`/`client_project_updates`/`client_project_plans` tables this section

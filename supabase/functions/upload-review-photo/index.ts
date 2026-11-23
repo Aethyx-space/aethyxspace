@@ -2,16 +2,14 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const allowedOrigins = [
-  "https://vibeshiftstudio.lovable.app",
-  "https://id-preview--9d25c426-f64e-4f23-85cf-2cebfabb0756.lovable.app",
+  "https://aethyx.space",
+  "https://www.aethyx.space",
   "http://localhost:8080",
   "http://localhost:5173",
 ];
 
 const getCorsHeaders = (origin: string | null) => {
-  const isAllowed = origin && allowedOrigins.some(allowed =>
-    origin === allowed || origin.endsWith('.lovable.app') || origin.endsWith('.lovableproject.com')
-  );
+  const isAllowed = origin && allowedOrigins.includes(origin);
   return {
     "Access-Control-Allow-Origin": isAllowed ? origin : "",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",

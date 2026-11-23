@@ -101,7 +101,7 @@ starts moving — you'll want that visibility once this is live and not just for
 Add "Tasks" as its own top-level portal nav item (`PortalLayout.tsx`), pulling from
 `client_project_tasks` (the table already wired to `client_project_plans` — **do not use**
 `project_tasks`/`project_updates`, a differently-named, separate pair of tables described in
-`.lovable/plan.md` for a deferred, unrelated Claude-Desktop-integration idea; confirm this
+`docs/project-context/plan.md` for a deferred, unrelated Claude-Desktop-integration idea; confirm this
 distinction during planning if there's any doubt).
 
 Notification bubbles: small count badges on nav items (Documents, Tasks, Agreements) when

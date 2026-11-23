@@ -24,7 +24,7 @@ Base URL: `https://<project>.functions.supabase.co/claude-project-api`
 | POST | `/api/tasks/create` | `project_id`, `title`, `description?`, `assignee?` (admin\|client), `priority?` (low\|med\|high), `due_date?`, `client_profile_id?` | Insert into `project_tasks` with `created_by='claude'`, `source='claude'`. Also inserts a `project_updates` row (`kind='claude_update'`, summary `"Claude added task: {title}"`). |
 | PATCH | `/api/tasks/update` | `task_id`, any of `title`, `description`, `status` (todo\|in_progress\|blocked\|done), `priority`, `assignee`, `due_date` | Update row. If `status='done'` set `completed_at=now()`. Insert matching `project_updates` row. |
 | POST | `/api/updates/create` | `project_id`, `summary`, `kind?` (note\|status_change\|claude_update\|deploy, default `claude_update`), `payload?` (jsonb) | Insert into `project_updates` with `created_by='claude'`. |
-| PATCH | `/api/projects/update` | `project_id`, any of `name`, `status`, `notes`, `current_phase`, `progress_pct` (0-100), `repo_url`, `dns_provider`, `hosting_provider`, `live_url`, `staging_url`, `lovable_url` | Update `client_projects`. Insert `project_updates` summarizing what changed. |
+| PATCH | `/api/projects/update` | `project_id`, any of `name`, `status`, `notes`, `current_phase`, `progress_pct` (0-100), `repo_url`, `dns_provider`, `hosting_provider`, `live_url`, `staging_url` | Update `client_projects`. Insert `project_updates` summarizing what changed. |
 
 All responses: `{ ok: true, data }` or `{ ok: false, error }` with proper status codes (400 validation, 401 auth, 404 not-found, 500 server).
 
