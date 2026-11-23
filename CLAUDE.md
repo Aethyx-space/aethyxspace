@@ -45,7 +45,7 @@ Key tables: `user_roles`, `client_profiles`, `client_invoices`, `client_agreemen
 - `stripe-sync-worker` — every minute, drives the managed Stripe integration.
 - `capture-expense-emails-daily` — 11:15 UTC daily, scans Gmail for subscription receipts → `financial_records` expenses. Bearer secret lives in Vault (`expense_capture_secret`) mirrored as edge secret `EXPENSE_CAPTURE_SECRET`.
 
-## Remaining planned work (`.lovable/plan.md`)
+## Remaining planned work (`docs/project-context/plan.md`)
 
 Most of the admin v2 plan has shipped (projects/tasks/portal routes/messaging/financials). Still open from it: Claude integration via a `claude-project-api` edge function and MCP server (`claude-mcp`, needs a `CLAUDE_API_TOKEN` secret), and edge-function dashboard widgets.
 
